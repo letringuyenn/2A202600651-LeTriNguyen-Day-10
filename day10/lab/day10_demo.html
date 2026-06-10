@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Day 10 data pipeline and observability demo"
+    />
+    <title>Day 10 Data Pipeline Demo</title>
+    <link rel="stylesheet" href="/day10_styles.css" />
+    <script src="/day10_app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">VinUni AI Engineering Lab</p>
+          <h1>🧪 Day 10 Data Pipeline &amp; Observability Demo</h1>
+          <p class="subtitle">
+            From dirty raw data to validated RAG-ready index
+          </p>
+        </div>
+        <div class="hero-badge" id="serviceBadge">
+          <span class="status-dot"></span>
+          Connecting
+        </div>
+      </header>
+
+      <main>
+        <section class="panel flow-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Project Flow</p>
+              <h2>One observable path from source to retrieval</h2>
+            </div>
+          </div>
+          <div class="flow" aria-label="Day 10 pipeline flow">
+            <span>Raw CSV</span><b>→</b>
+            <span>Cleaning Rules</span><b>→</b>
+            <span>Quality Expectations</span><b>→</b>
+            <span>Cleaned Snapshot</span><b>→</b>
+            <span>Chroma Publish</span><b>→</b>
+            <span>Eval / Grading</span><b>→</b>
+            <span>Freshness Monitor</span>
+          </div>
+        </section>
+
+        <section class="status-grid" aria-label="Pipeline status">
+          <article class="status-card">
+            <p>Quality Status</p>
+            <strong id="qualityStatus">--</strong>
+          </article>
+          <article class="status-card">
+            <p>Raw Records</p>
+            <strong id="rawRecords">--</strong>
+          </article>
+          <article class="status-card">
+            <p>Cleaned Records</p>
+            <strong id="cleanedRecords">--</strong>
+          </article>
+          <article class="status-card">
+            <p>Quarantine Records</p>
+            <strong id="quarantineRecords">--</strong>
+          </article>
+          <article class="status-card">
+            <p>Publish Status</p>
+            <strong id="publishStatus">--</strong>
+          </article>
+          <article class="status-card">
+            <p>Grading Result</p>
+            <strong id="gradingResult">--</strong>
+          </article>
+          <article class="status-card">
+            <p>Freshness Status</p>
+            <strong id="freshnessStatus">--</strong>
+          </article>
+          <article class="status-card run-card">
+            <p>Latest Run ID</p>
+            <strong id="latestRunId">--</strong>
+          </article>
+        </section>
+
+        <section class="panel actions-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Controls</p>
+              <h2>Run and inspect each stage</h2>
+            </div>
+            <p id="lastAction" class="muted">Ready</p>
+          </div>
+          <div class="actions">
+            <button data-action="summary" class="secondary">
+              Refresh Summary
+            </button>
+            <button data-action="pipeline">Run ETL Pipeline</button>
+            <button data-action="eval">Run Retrieval Eval</button>
+            <button data-action="grading">Run Grading</button>
+            <button data-action="freshness" class="secondary">
+              Run Freshness Check
+            </button>
+          </div>
+        </section>
+
+        <div class="content-grid">
+          <section class="panel">
+            <div class="section-heading compact">
+              <div>
+                <p class="section-kicker">Cleaning Metrics</p>
+                <h2>Measured data corrections</h2>
+              </div>
+            </div>
+            <dl class="metric-list" id="cleaningMetrics"></dl>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading compact">
+              <div>
+                <p class="section-kicker">Artifacts</p>
+                <h2>Latest generated outputs</h2>
+              </div>
+            </div>
+            <dl class="artifact-list" id="artifactList"></dl>
+          </section>
+        </div>
+
+        <section class="panel grading-panel">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Grading Result</p>
+              <h2 id="gradingHeadline">No grading result loaded</h2>
+            </div>
+            <div class="grading-signals" id="gradingSignals"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Top-1 document</th>
+                  <th>Top-1 match</th>
+                  <th>Contains expected</th>
+                  <th>Hits forbidden</th>
+                </tr>
+              </thead>
+              <tbody id="gradingRows">
+                <tr>
+                  <td colspan="5" class="empty-state">
+                    Run grading or refresh summary to load results.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel custom-lab">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Custom Grading Lab</p>
+              <h2>Manage experimental retrieval questions</h2>
+            </div>
+            <label class="mode-selector">
+              Question set
+              <select id="gradingMode">
+                <option value="official">Official grading</option>
+                <option value="custom">Custom grading</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="safety-note">
+            <strong>Official grading questions are read-only from the UI.</strong>
+            Use custom grading to experiment without changing the official
+            10-question benchmark.
+          </div>
+
+          <div class="actions custom-actions">
+            <button id="loadOfficialQuestions" class="secondary">
+              Load official questions
+            </button>
+            <button id="loadCustomQuestions" class="secondary">
+              Load custom questions
+            </button>
+            <button id="newCustomQuestion">Add custom question</button>
+            <button id="saveCustomQuestions">Save custom questions</button>
+            <button id="runCustomGrading">Run custom grading</button>
+            <button id="refreshCustomResults" class="secondary">
+              Refresh custom grading result
+            </button>
+          </div>
+          <p class="muted custom-message" id="customGradingMessage">
+            Load a question set to begin.
+          </p>
+
+          <div class="custom-workspace">
+            <div>
+              <h3 class="subheading">Questions</h3>
+              <div class="table-wrap custom-question-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Question</th>
+                      <th>Expected top-1</th>
+                      <th>Must contain</th>
+                      <th>Must not contain</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="customQuestionRows">
+                    <tr>
+                      <td colspan="6" class="empty-state">
+                        No question set loaded.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <form id="customQuestionForm" class="question-form">
+              <div class="form-heading">
+                <div>
+                  <p class="section-kicker">Question Editor</p>
+                  <h3 id="questionFormTitle">Add or edit a custom question</h3>
+                </div>
+                <button type="reset" class="secondary small-button">
+                  Clear
+                </button>
+              </div>
+              <label>
+                ID
+                <input id="customQuestionId" name="id" required />
+              </label>
+              <label>
+                Question
+                <textarea
+                  id="customQuestionText"
+                  name="question"
+                  rows="3"
+                  required
+                ></textarea>
+              </label>
+              <label>
+                Expected top-1 doc ID
+                <select id="customExpectedDocId" name="expect_top1_doc_id">
+                  <option value="policy_refund_v4">policy_refund_v4</option>
+                  <option value="sla_p1_2026">sla_p1_2026</option>
+                  <option value="it_helpdesk_faq">it_helpdesk_faq</option>
+                  <option value="hr_leave_policy">hr_leave_policy</option>
+                  <option value="access_control_sop">access_control_sop</option>
+                </select>
+              </label>
+              <label>
+                Must contain, comma-separated
+                <input id="customMustContain" name="must_contain_any" />
+              </label>
+              <label>
+                Must not contain, comma-separated
+                <input id="customMustNotContain" name="must_not_contain" />
+              </label>
+              <label>
+                Grading criteria, one per line
+                <textarea
+                  id="customCriteria"
+                  name="grading_criteria"
+                  rows="4"
+                ></textarea>
+              </label>
+              <button type="submit" id="applyCustomQuestion">
+                Apply question to custom list
+              </button>
+            </form>
+          </div>
+
+          <div class="custom-result">
+            <div class="section-heading compact">
+              <div>
+                <p class="section-kicker">Custom Result</p>
+                <h2 id="customResultHeadline">No custom grading result</h2>
+              </div>
+              <div class="grading-signals" id="customResultSignals"></div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Top-1 document</th>
+                    <th>Top-1 match</th>
+                    <th>Contains expected</th>
+                    <th>Hits forbidden</th>
+                    <th>Passed</th>
+                  </tr>
+                </thead>
+                <tbody id="customResultRows">
+                  <tr>
+                    <td colspan="6" class="empty-state">
+                      Run or refresh custom grading to load results.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="freshness-note" id="freshnessNote">
+          <div class="note-icon">i</div>
+          <div>
+            <strong>Freshness is an observability signal</strong>
+            <p>
+              Freshness FAIL means the sample dataset is older than the SLA.
+              This is an observability signal, not a pipeline quality failure.
+            </p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <details id="logDetails">
+            <summary>
+              <span>Command Output</span>
+              <span class="muted" id="logSummary">No command run yet</span>
+            </summary>
+            <div class="log-grid">
+              <div>
+                <h3>stdout</h3>
+                <pre id="stdoutLog">No output yet.</pre>
+              </div>
+              <div>
+                <h3>stderr</h3>
+                <pre id="stderrLog">No errors.</pre>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <section class="panel run-panel">
+          <div>
+            <p class="section-kicker">Run Locally</p>
+            <h2>Start the demo</h2>
+            <p class="muted">
+              The UI and API run from the same lightweight FastAPI process.
+            </p>
+          </div>
+          <div class="command-stack">
+            <code>cd day10/lab</code>
+            <code>.venv\Scripts\python.exe run_day10_web_demo.py</code>
+            <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a>
+            <a href="/README_PROJECT.md" class="readme-link">README_PROJECT.md</a>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <span>Day 10 · Data quality before model debugging</span>
+        <span id="manifestPath">Manifest not loaded</span>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+from grading_questions import QuestionValidationError, load_and_validate_questions
+from retrieval_embedding import get_embedding_function
 
 load_dotenv()
 ROOT = Path(__file__).resolve().parent
@@ -36,19 +38,24 @@ def main() -> int:
 
     try:
         import chromadb
-        from chromadb.utils import embedding_functions
     except ImportError:
-        print("pip install chromadb sentence-transformers", file=sys.stderr)
+        print("pip install chromadb", file=sys.stderr)
         return 1
 
     qpath = Path(args.questions)
-    qs = json.loads(qpath.read_text(encoding="utf-8"))
+    try:
+        qs, warnings = load_and_validate_questions(qpath)
+    except QuestionValidationError as exc:
+        print(f"Question validation error: {exc}", file=sys.stderr)
+        return 2
+    for warning in warnings:
+        print(f"WARNING: {warning}", file=sys.stderr)
+
     db_path = os.environ.get("CHROMA_DB_PATH", str(ROOT / "chroma_db"))
     collection_name = os.environ.get("CHROMA_COLLECTION", "day10_kb")
-    model_name = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
     client = chromadb.PersistentClient(path=db_path)
-    emb = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=model_name)
+    emb = get_embedding_function()
     col = client.get_collection(name=collection_name, embedding_function=emb)
 
     out = Path(args.out)

@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""
-Lab Day 10 — ETL entrypoint: ingest → clean → validate → embed.
-
-Tiếp nối Day 09: cùng corpus docs trong data/docs/; pipeline này xử lý *export* raw (CSV)
-đại diện cho lớp ingestion từ DB/API trước khi embed lại vector store.
-
-Chạy nhanh:
-  pip install -r requirements.txt
-  cp .env.example .env
-  python etl_pipeline.py run
-
-Chế độ inject (Sprint 3 — bỏ fix refund để expectation fail / eval xấu):
-  python etl_pipeline.py run --no-refund-fix --skip-validate
-"""
+"""Day 10 ETL entrypoint: ingest -> clean -> validate -> embed."""
 
 from __future__ import annotations
 
@@ -27,7 +14,13 @@ from dotenv import load_dotenv
 
 from monitoring.freshness_check import check_manifest_freshness
 from quality.expectations import run_expectations
-from transform.cleaning_rules import clean_rows, load_raw_csv, write_cleaned_csv, write_quarantine_csv
+from retrieval_embedding import get_embedding_function
+from transform.cleaning_rules import (
+    clean_rows,
+    load_raw_csv,
+    write_cleaned_csv,
+    write_quarantine_csv,
+)
 
 load_dotenv()
 
@@ -66,10 +59,12 @@ def cmd_run(args: argparse.Namespace) -> int:
     log(f"run_id={run_id}")
     log(f"raw_records={raw_count}")
 
-    cleaned, quarantine = clean_rows(
+    cleaned, quarantine, cleaning_stats = clean_rows(
         rows,
         apply_refund_window_fix=not args.no_refund_fix,
+        return_stats=True,
     )
+
     cleaned_path = CLEAN_DIR / f"cleaned_{run_id.replace(':', '-')}.csv"
     quar_path = QUAR_DIR / f"quarantine_{run_id.replace(':', '-')}.csv"
     write_cleaned_csv(cleaned_path, cleaned)
@@ -77,32 +72,25 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     log(f"cleaned_records={len(cleaned)}")
     log(f"quarantine_records={len(quarantine)}")
+    log("cleaning_stats=" + json.dumps(cleaning_stats, ensure_ascii=False, sort_keys=True))
     log(f"cleaned_csv={cleaned_path.relative_to(ROOT)}")
     log(f"quarantine_csv={quar_path.relative_to(ROOT)}")
 
     results, halt = run_expectations(cleaned)
-    for r in results:
-        sym = "OK" if r.passed else "FAIL"
-        log(f"expectation[{r.name}] {sym} ({r.severity}) :: {r.detail}")
+    for result in results:
+        sym = "OK" if result.passed else "FAIL"
+        log(f"expectation[{result.name}] {sym} ({result.severity}) :: {result.detail}")
     if halt and not args.skip_validate:
         log("PIPELINE_HALT: expectation suite failed (halt).")
         return 2
     if halt and args.skip_validate:
-        log("WARN: expectation failed but --skip-validate → tiếp tục embed (chỉ dùng cho demo Sprint 3).")
+        log("WARN: expectation failed but --skip-validate -> continuing embed for demo mode.")
 
-    # Embed
-    embed_ok = cmd_embed_internal(
-        cleaned_path,
-        run_id=run_id,
-        log=log,
-    )
-    if not embed_ok:
+    publish = cmd_embed_internal(cleaned_path, run_id=run_id, log=log)
+    if publish is None:
         return 3
 
-    latest_exported = ""
-    if cleaned:
-        latest_exported = max((r.get("exported_at") or "" for r in cleaned), default="")
-
+    latest_exported = max((r.get("exported_at") or "" for r in cleaned), default="")
     manifest = {
         "run_id": run_id,
         "run_timestamp": datetime.now(timezone.utc).isoformat(),
@@ -111,70 +99,104 @@ def cmd_run(args: argparse.Namespace) -> int:
         "cleaned_records": len(cleaned),
         "quarantine_records": len(quarantine),
         "latest_exported_at": latest_exported,
+        "quality_status": "FAIL" if halt else "PASS",
+        "quality_halt": bool(halt),
+        "quality_summary": {
+            result.name: {
+                "passed": result.passed,
+                "severity": result.severity,
+                "detail": result.detail,
+            }
+            for result in results
+        },
+        "cleaning_stats": cleaning_stats,
         "no_refund_fix": bool(args.no_refund_fix),
         "skipped_validate": bool(args.skip_validate and halt),
         "cleaned_csv": str(cleaned_path.relative_to(ROOT)),
-        "chroma_path": os.environ.get("CHROMA_DB_PATH", "./chroma_db"),
-        "chroma_collection": os.environ.get("CHROMA_COLLECTION", "day10_kb"),
+        "publish": publish,
     }
     man_path = MAN_DIR / f"manifest_{run_id.replace(':', '-')}.json"
     man_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     log(f"manifest_written={man_path.relative_to(ROOT)}")
 
-    status, fdetail = check_manifest_freshness(man_path, sla_hours=float(os.environ.get("FRESHNESS_SLA_HOURS", "24")))
+    status, fdetail = check_manifest_freshness(
+        man_path,
+        sla_hours=float(os.environ.get("FRESHNESS_SLA_HOURS", "24")),
+    )
     log(f"freshness_check={status} {json.dumps(fdetail, ensure_ascii=False)}")
-
     log("PIPELINE_OK")
     return 0
 
 
-def cmd_embed_internal(cleaned_csv: Path, *, run_id: str, log) -> bool:
+def cmd_embed_internal(cleaned_csv: Path, *, run_id: str, log) -> dict[str, object] | None:
     try:
         import chromadb
-        from chromadb.utils import embedding_functions
     except ImportError:
-        log("ERROR: chromadb chưa cài. pip install -r requirements.txt")
-        return False
+        log("ERROR: chromadb not installed. pip install -r requirements.txt")
+        return None
 
     db_path = os.environ.get("CHROMA_DB_PATH", str(ROOT / "chroma_db"))
     collection_name = os.environ.get("CHROMA_COLLECTION", "day10_kb")
-    model_name = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
-    from transform.cleaning_rules import load_raw_csv as load_csv  # same loader
+    from transform.cleaning_rules import load_raw_csv as load_csv
 
     rows = load_csv(cleaned_csv)
     if not rows:
-        log("WARN: cleaned CSV rỗng — không embed.")
-        return True
+        log("WARN: cleaned CSV empty - nothing to embed.")
+        return {
+            "status": "SKIPPED",
+            "db_path": db_path,
+            "collection_name": collection_name,
+            "upserted_ids": 0,
+            "pruned_ids": 0,
+            "row_count": 0,
+        }
 
     client = chromadb.PersistentClient(path=db_path)
-    emb = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=model_name)
+    emb = get_embedding_function()
     col = client.get_or_create_collection(name=collection_name, embedding_function=emb)
 
     ids = [r["chunk_id"] for r in rows]
-    # Tránh “mồi cũ” trong top-k: xóa id không còn trong cleaned run này (index = snapshot publish).
+    pruned_ids = 0
     try:
         prev = col.get(include=[])
         prev_ids = set(prev.get("ids") or [])
         drop = sorted(prev_ids - set(ids))
         if drop:
             col.delete(ids=drop)
-            log(f"embed_prune_removed={len(drop)}")
-    except Exception as e:
-        log(f"WARN: embed prune skip: {e}")
+            pruned_ids = len(drop)
+            log(f"embed_prune_removed={pruned_ids}")
+    except Exception as exc:
+        log(f"WARN: embed prune skip: {exc}")
+
     documents = [r["chunk_text"] for r in rows]
     metadatas = [
         {
+            "chunk_id": r.get("chunk_id", ""),
             "doc_id": r.get("doc_id", ""),
+            "title": r.get("title", ""),
+            "source_name": r.get("source_name", ""),
+            "source_system": r.get("source_system", ""),
+            "source_domain": r.get("source_domain", ""),
+            "source_path": r.get("source_path", ""),
             "effective_date": r.get("effective_date", ""),
+            "exported_at": r.get("exported_at", ""),
+            "cleaning_flags": r.get("cleaning_flags", ""),
             "run_id": run_id,
+            "retriever": "day10_etl",
         }
         for r in rows
     ]
-    # Idempotent: upsert theo chunk_id
     col.upsert(ids=ids, documents=documents, metadatas=metadatas)
     log(f"embed_upsert count={len(ids)} collection={collection_name}")
-    return True
+    return {
+        "status": "OK",
+        "db_path": db_path,
+        "collection_name": collection_name,
+        "upserted_ids": len(ids),
+        "pruned_ids": pruned_ids,
+        "row_count": len(rows),
+    }
 
 
 def cmd_freshness(args: argparse.Namespace) -> int:
@@ -192,22 +214,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Day 10 ETL pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_run = sub.add_parser("run", help="ingest → clean → validate → embed")
-    p_run.add_argument("--raw", default=str(RAW_DEFAULT), help="Đường dẫn CSV raw export")
-    p_run.add_argument("--run-id", default="", help="ID run (mặc định: UTC timestamp)")
+    p_run = sub.add_parser("run", help="ingest -> clean -> validate -> embed")
+    p_run.add_argument("--raw", default=str(RAW_DEFAULT), help="Path to raw CSV export")
+    p_run.add_argument("--run-id", default="", help="Run ID (default: UTC timestamp)")
     p_run.add_argument(
         "--no-refund-fix",
         action="store_true",
-        help="Không áp dụng rule fix cửa sổ 14→7 ngày (dùng cho inject corruption / before).",
+        help="Do not apply the refund-window canonicalization rule.",
     )
     p_run.add_argument(
         "--skip-validate",
         action="store_true",
-        help="Vẫn embed khi expectation halt (chỉ phục vụ demo có chủ đích).",
+        help="Embed even when the expectation suite halts (demo only).",
     )
     p_run.set_defaults(func=cmd_run)
 
-    p_fr = sub.add_parser("freshness", help="Đọc manifest và kiểm tra SLA freshness")
+    p_fr = sub.add_parser("freshness", help="Read manifest and check freshness SLA")
     p_fr.add_argument("--manifest", required=True)
     p_fr.set_defaults(func=cmd_freshness)
 

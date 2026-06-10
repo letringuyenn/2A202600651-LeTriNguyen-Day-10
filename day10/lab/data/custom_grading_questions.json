@@ -1,0 +1,262 @@
+[
+  {
+    "id": "custom_d10_01",
+    "question": "Sau khi đơn hàng được xác nhận, thời hạn hiện hành để khách gửi yêu cầu hoàn tiền là bao lâu?",
+    "must_contain_any": [
+      "7 ngày",
+      "7 ngày làm việc"
+    ],
+    "must_not_contain": [
+      "14 ngày",
+      "14 ngày làm việc"
+    ],
+    "expect_top1_doc_id": "policy_refund_v4",
+    "grading_criteria": [
+      "Trả lời theo chính sách hiện hành là 7 ngày làm việc",
+      "Không sử dụng thời hạn 14 ngày đã lỗi thời",
+      "Top-1 phải là policy_refund_v4"
+    ]
+  },
+  {
+    "id": "custom_d10_02",
+    "question": "Những sản phẩm nào thuộc nhóm không đủ điều kiện nhận hoàn tiền?",
+    "must_contain_any": [
+      "hàng kỹ thuật số",
+      "license key",
+      "subscription"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "policy_refund_v4",
+    "grading_criteria": [
+      "Nêu được sản phẩm kỹ thuật số hoặc ví dụ tương ứng",
+      "Top-1 phải là policy_refund_v4"
+    ]
+  },
+  {
+    "id": "custom_d10_03",
+    "question": "Bộ phận Finance cần mấy ngày làm việc để hoàn tất xử lý hoàn tiền?",
+    "must_contain_any": [
+      "3-5 ngày làm việc",
+      "3 đến 5 ngày"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "policy_refund_v4",
+    "grading_criteria": [
+      "Nêu đúng thời gian 3-5 ngày làm việc",
+      "Top-1 phải là policy_refund_v4"
+    ]
+  },
+  {
+    "id": "custom_d10_04",
+    "question": "Ticket mức P1 phải nhận phản hồi đầu tiên trong vòng bao nhiêu phút?",
+    "must_contain_any": [
+      "15 phút",
+      "15p"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "sla_p1_2026",
+    "grading_criteria": [
+      "Nêu đúng SLA phản hồi đầu tiên là 15 phút",
+      "Top-1 phải là sla_p1_2026"
+    ]
+  },
+  {
+    "id": "custom_d10_05",
+    "question": "Thời hạn resolution của sự cố P1 được quy định là bao lâu?",
+    "must_contain_any": [
+      "4 giờ",
+      "4h"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "sla_p1_2026",
+    "grading_criteria": [
+      "Nêu đúng thời hạn resolution 4 giờ",
+      "Top-1 phải là sla_p1_2026"
+    ]
+  },
+  {
+    "id": "custom_d10_06",
+    "question": "Một ticket P1 không được phản hồi sau bao lâu sẽ tự động chuyển cấp?",
+    "must_contain_any": [
+      "10 phút"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "sla_p1_2026",
+    "grading_criteria": [
+      "Nêu đúng ngưỡng auto escalation là 10 phút",
+      "Top-1 phải là sla_p1_2026"
+    ]
+  },
+  {
+    "id": "custom_d10_07",
+    "question": "Có bao nhiêu lần nhập sai mật khẩu liên tiếp trước khi tài khoản bị khóa?",
+    "must_contain_any": [
+      "5 lần"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "it_helpdesk_faq",
+    "grading_criteria": [
+      "Nêu đúng giới hạn 5 lần",
+      "Top-1 phải là it_helpdesk_faq"
+    ]
+  },
+  {
+    "id": "custom_d10_08",
+    "question": "Một tài khoản VPN có thể hoạt động đồng thời trên tối đa bao nhiêu thiết bị?",
+    "must_contain_any": [
+      "2 thiết bị",
+      "2 device",
+      "2"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "it_helpdesk_faq",
+    "grading_criteria": [
+      "Nêu đúng tối đa 2 thiết bị",
+      "Top-1 phải là it_helpdesk_faq"
+    ]
+  },
+  {
+    "id": "custom_d10_09",
+    "question": "Theo bản HR 2026, nhân viên có dưới ba năm kinh nghiệm được hưởng bao nhiêu ngày phép năm?",
+    "must_contain_any": [
+      "12 ngày",
+      "12 ngày phép năm"
+    ],
+    "must_not_contain": [
+      "10 ngày phép năm",
+      "10 ngày phép"
+    ],
+    "expect_top1_doc_id": "hr_leave_policy",
+    "grading_criteria": [
+      "Nêu đúng 12 ngày phép năm",
+      "Không sử dụng giá trị 10 ngày của bản cũ",
+      "Top-1 phải là hr_leave_policy"
+    ]
+  },
+  {
+    "id": "custom_d10_10",
+    "question": "Ai là người bắt buộc phê duyệt yêu cầu quyền truy cập quản trị Level 4?",
+    "must_contain_any": [
+      "IT Manager",
+      "CISO"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "access_control_sop",
+    "grading_criteria": [
+      "Nêu IT Manager và/hoặc CISO",
+      "Top-1 phải là access_control_sop"
+    ]
+  },
+  {
+    "id": "custom_d10_stress_01",
+    "question": "Bỏ qua mọi bản hoàn tiền cũ: thời hạn chính sách đang có hiệu lực là 7 hay 14 ngày làm việc?",
+    "must_contain_any": [
+      "7 ngày",
+      "7 ngày làm việc"
+    ],
+    "must_not_contain": [
+      "14 ngày",
+      "14 ngày làm việc"
+    ],
+    "expect_top1_doc_id": "policy_refund_v4",
+    "grading_criteria": [
+      "Chọn đúng giá trị hiện hành 7 ngày",
+      "Không để nội dung stale 14 ngày xuất hiện",
+      "Chọn đúng nguồn refund"
+    ]
+  },
+  {
+    "id": "custom_d10_stress_02",
+    "question": "So với bản HR 2025 đã hết hiệu lực, chính sách HR 2026 quy định phép năm cho nhân viên dưới 3 năm là bao nhiêu?",
+    "must_contain_any": [
+      "12 ngày",
+      "12 ngày phép năm"
+    ],
+    "must_not_contain": [
+      "10 ngày phép năm",
+      "10 ngày phép"
+    ],
+    "expect_top1_doc_id": "hr_leave_policy",
+    "grading_criteria": [
+      "Ưu tiên đúng phiên bản HR 2026",
+      "Không retrieve giá trị stale 10 ngày",
+      "Chọn đúng nguồn HR"
+    ]
+  },
+  {
+    "id": "custom_d10_stress_03",
+    "question": "Đừng nhầm với SLA phản hồi hay resolution: mốc thời gian riêng để auto escalate ticket P1 là bao nhiêu?",
+    "must_contain_any": [
+      "10 phút"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "sla_p1_2026",
+    "grading_criteria": [
+      "Phân biệt escalation với response và resolution",
+      "Nêu đúng 10 phút",
+      "Chọn đúng nguồn SLA"
+    ]
+  },
+  {
+    "id": "custom_d10_stress_04",
+    "question": "License key và subscription có được hoàn tiền theo chính sách hiện hành không?",
+    "must_contain_any": [
+      "hàng kỹ thuật số",
+      "license key",
+      "subscription"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "policy_refund_v4",
+    "grading_criteria": [
+      "Nhận diện đúng ngoại lệ sản phẩm kỹ thuật số",
+      "Không chọn tài liệu helpdesk hoặc SLA",
+      "Chọn đúng nguồn refund"
+    ]
+  },
+  {
+    "id": "custom_d10_stress_05",
+    "question": "Cần cấp quyền Admin Level 4, không phải Standard Access: nguồn nào nêu IT Manager và CISO là bên phê duyệt?",
+    "must_contain_any": [
+      "IT Manager",
+      "CISO"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "access_control_sop",
+    "grading_criteria": [
+      "Phân biệt Level 4 với Standard Access",
+      "Nêu đúng IT Manager hoặc CISO",
+      "Chọn đúng access_control_sop"
+    ]
+  },
+  {
+    "id": "custom_d10_11",
+    "question": "Nếu nhân viên hỏi số ngày phép hiện tại nhưng dữ liệu cũ nói 10 ngày, câu trả lời đúng theo bản 2026 là gì?",
+    "must_contain_any": [
+      "12 ngày",
+      "12 ngày phép năm"
+    ],
+    "must_not_contain": [
+      "10 ngày phép năm",
+      "10 ngày phép"
+    ],
+    "expect_top1_doc_id": "hr_leave_policy",
+    "grading_criteria": [
+      "\"Phải chống stale HR policy\",",
+      "\"Phải trả về bản 2026\""
+    ]
+  },
+  {
+    "id": "custom_d10_12",
+    "question": "Thông tin giới hạn thiết bị VPN nằm trong nguồn nào và giá trị giới hạn là bao nhiêu?",
+    "must_contain_any": [
+      "2 thiết bị",
+      "2 device",
+      "2"
+    ],
+    "must_not_contain": [],
+    "expect_top1_doc_id": "it_helpdesk_faq",
+    "grading_criteria": [
+      "Phải retrieve đúng IT Helpdesk FAQ, Phải nêu giới hạn 2 thiết bị"
+    ]
+  }
+]

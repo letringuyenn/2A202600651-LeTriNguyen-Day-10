@@ -1,19 +1,17 @@
-# Data contract — Lab Day 10 (tiếp nối artifact CS + IT Helpdesk)
-# Sinh viên bổ sung owner, SLA freshness, và nguồn canonical.
-
-version: "1.0"
+version: "1.1"
 dataset: "kb_chunk_export"
-owner_team: "__TODO__"
+owner_team: "CS + IT Helpdesk Data Platform"
+description: "Canonical cleaned export for the Day 10 CS + IT Helpdesk corpus."
 
 schema_cleaned:
   chunk_id:
     type: string
     required: true
-    description: "ID ổn định sau clean (thường hash hoặc doc_id + seq)"
+    description: "Stable deterministic chunk ID derived from doc_id + effective_date + content hash."
   doc_id:
     type: string
     required: true
-    description: "Khóa logic tài liệu nguồn (vd policy_refund_v4)"
+    description: "Canonical logical source ID, aligned with grading expectations."
   chunk_text:
     type: string
     required: true
@@ -25,36 +23,77 @@ schema_cleaned:
   exported_at:
     type: datetime
     required: true
+  title:
+    type: string
+    required: true
+  source_name:
+    type: string
+    required: true
+  source_system:
+    type: string
+    required: true
+  source_domain:
+    type: string
+    required: true
+  source_path:
+    type: string
+    required: false
+  cleaning_flags:
+    type: string
+    required: false
 
 quality_rules:
-  - id: "no_duplicate_chunk_text"
-    severity: "warn"
-  - id: "no_stale_refund_window"
-    description: "Không được để chunk policy refund chứa cửa sổ 14 ngày (lệch so với v4 = 7 ngày)"
+  - id: "required_grading_sources_present"
     severity: "halt"
+  - id: "no_stale_refund_or_hr_content"
+    severity: "halt"
+  - id: "metadata_completeness"
+    severity: "halt"
+  - id: "unique_chunk_id"
+    severity: "warn"
 
 freshness:
-  measured_at: "publish"  # ingest | cleaned | publish
+  measured_at: "publish"
   sla_hours: 24
-  alert_channel: "__TODO__"
+  alert_channel: "lab-monitoring"
 
 canonical_sources:
   - path: "data/docs/policy_refund_v4.txt"
     doc_id: "policy_refund_v4"
+    owner_team: "CS Operations"
   - path: "data/docs/sla_p1_2026.txt"
     doc_id: "sla_p1_2026"
+    owner_team: "IT Operations"
   - path: "data/docs/it_helpdesk_faq.txt"
     doc_id: "it_helpdesk_faq"
+    owner_team: "IT Helpdesk"
   - path: "data/docs/hr_leave_policy.txt"
     doc_id: "hr_leave_policy"
+    owner_team: "HR Operations"
+  - path: "data/docs/access_control_sop.txt"
+    doc_id: "access_control_sop"
+    owner_team: "IT Security"
 
-# Baseline allowlist export — nhóm mở rộng doc mới phải đồng bộ cleaning_rules + contract.
 allowed_doc_ids:
   - policy_refund_v4
   - sla_p1_2026
   - it_helpdesk_faq
   - hr_leave_policy
+  - access_control_sop
 
-# Merit/Distinction: có thể đưa cutoff versioning vào env và tham chiếu ở đây (tránh hard-code trong code).
+required_metadata_fields:
+  - chunk_id
+  - doc_id
+  - chunk_text
+  - effective_date
+  - exported_at
+  - title
+  - source_name
+  - source_system
+  - source_domain
+  - run_id
+  - retriever
+
 policy_versioning:
   hr_leave_min_effective_date: "2026-01-01"
+  refund_current_window_days: 7
